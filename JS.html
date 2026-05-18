@@ -9,13 +9,25 @@
 const AppLogic = (() => {
     let state = {
         clients: [],
-        incomingData: [], // State untuk menampung data form baru
+        incomingData: [],
         isAuthenticated: false,
         isEditing: false,
         editOldId: null,
-        pendingFormRowIdx: null, // Jembatan ID untuk status Sinkronisasi Form
+        pendingFormRowIdx: null,
         searchQuery: '',
-        globalSettings: null
+        globalSettings: null,
+        // Pagination state
+        currentPage: 1,
+        itemsPerPage: 25
+    };
+
+    // Debounce utility - mencegah render berulang saat user mengetik cepat
+    let searchTimeout = null;
+    const debounce = (fn, delay = 300) => {
+        return (...args) => {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(() => fn(...args), delay);
+        };
     };
 
     const el = {
@@ -81,10 +93,11 @@ const AppLogic = (() => {
             fetchClients();
             fetchIncomingData(); // Refresh notifikasi juga
         });
-        el.searchInput.addEventListener('input', (e) => {
+        el.searchInput.addEventListener('input', debounce((e) => {
             state.searchQuery = e.target.value.toLowerCase();
+            state.currentPage = 1; // Reset ke halaman 1 saat pencarian berubah
             renderTable();
-        });
+        }, 300));
         
         el.btnAdd.addEventListener('click', () => openModal());
         el.btnIncoming.addEventListener('click', () => {

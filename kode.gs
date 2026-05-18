@@ -79,8 +79,17 @@ function verifyPin(inputPin) {
   }
 }
 
-// 6. FETCH DATA KLIEN
+// 6. FETCH DATA KLIEN - Dengan CacheService untuk performa lebih cepat
 function getClients() {
+  // Try cache first for faster response
+  try {
+    const cache = CacheService.getScriptCache();
+    const cached = cache.get('clients_data');
+    if (cached) {
+      return { success: true, data: JSON.parse(cached), cached: true };
+    }
+  } catch(e) {}
+  
   try {
     const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(CONFIG.SHEET_NAME);
     if (!sheet) throw new Error(`Sheet '${CONFIG.SHEET_NAME}' tidak ditemukan!`);
@@ -103,6 +112,11 @@ function getClients() {
       tahap1: String(row[11] || 'Belum'),
       tahap2: String(row[12] || 'Belum')
     }));
+    
+    // Cache data selama 5 menit untuk mengurangi pembacaan sheet berulang
+    try {
+      cache.put('clients_data', JSON.stringify(clients), 300); // 300 detik = 5 menit
+    } catch(e) {}
     
     return { success: true, data: clients };
   } catch (error) {
@@ -199,6 +213,13 @@ function markFormProcessed(rowIdx, message) {
     
     // Tulis pesan di Kolom L (Kolom ke-12)
     sheet.getRange(rowIdx, 12).setValue(message);
+    
+    // Hapus cache clients agar data terrefresh setelah update
+    try {
+      const cache = CacheService.getScriptCache();
+      cache.remove('clients_data');
+    } catch(e) {}
+    
     return { success: true };
   } catch (error) {
     return { success: false, message: error.message };
@@ -206,8 +227,19 @@ function markFormProcessed(rowIdx, message) {
 }
 
 // ==========================================
-// 9. CRUD OPERATIONS (Dengan LockService)
+// 10. PAGINATION HELPER
 // ==========================================
+function paginateData(data, page, itemsPerPage) {
+  const startIndex = (page - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  return {
+    data: data.slice(startIndex, endIndex),
+    total: data.length,
+    page: page,
+    itemsPerPage: itemsPerPage,
+    totalPages: Math.ceil(data.length / itemsPerPage)
+  };
+}
 function addClient(clientData) {
   const lock = LockService.getScriptLock();
   try {
@@ -224,6 +256,12 @@ function addClient(clientData) {
     ];
     
     sheet.appendRow(rowData);
+    
+    // Hapus cache clients agar data terrefresh
+    try {
+      const cache = CacheService.getScriptCache();
+      cache.remove('clients_data');
+    } catch(e) {}
     
     // LOGIKA BARU: Jika ini adalah data yang ditarik dari Form, tandai otomatis di sheet DataForm!
     if (clientData.formRowIdx) {
@@ -258,6 +296,13 @@ function updateClient(oldId, clientData) {
     ]];
     
     sheet.getRange(rowIdx, 1, 1, 13).setValues(rowData);
+    
+    // Hapus cache clients agar data terrefresh
+    try {
+      const cache = CacheService.getScriptCache();
+      cache.remove('clients_data');
+    } catch(e) {}
+    
     return { success: true, message: "Data berhasil diperbarui!" };
   } catch (error) {
     return { success: false, message: error.message };
@@ -276,6 +321,13 @@ function deleteClient(id) {
     if (!finder) throw new Error("Data tidak ditemukan.");
     
     sheet.deleteRow(finder.getRow());
+    
+    // Hapus cache clients agar data terrefresh
+    try {
+      const cache = CacheService.getScriptCache();
+      cache.remove('clients_data');
+    } catch(e) {}
+    
     return { success: true, message: "Data berhasil dihapus!" };
   } catch (error) {
     return { success: false, message: error.message };
