@@ -1,0 +1,540 @@
+<script>
+/**
+ * ====================================================
+ * FRONTEND LOGIC (JS.html)
+ * ====================================================
+ * STANDAR: Non-blocking UI, Error Handling, Fallback Security
+ */
+
+const AppLogic = (() => {
+    let state = {
+        clients: [],
+        incomingData: [], // State untuk menampung data form baru
+        isAuthenticated: false,
+        isEditing: false,
+        editOldId: null,
+        pendingFormRowIdx: null, // Jembatan ID untuk status Sinkronisasi Form
+        searchQuery: '',
+        globalSettings: null
+    };
+
+    const el = {
+        viewLogin: document.getElementById('view-login'),
+        viewDashboard: document.getElementById('view-dashboard'),
+        loginForm: document.getElementById('loginForm'),
+        pinInput: document.getElementById('pinInput'),
+        btnLogin: document.getElementById('btn-login'),
+        tableBody: document.getElementById('table-body'),
+        searchInput: document.getElementById('searchInput'),
+        clientCount: document.getElementById('client-count'),
+        btnReload: document.getElementById('btn-reload'),
+        btnLogout: document.getElementById('btn-logout'),
+        btnAdd: document.getElementById('btn-add'),
+        
+        btnIncoming: document.getElementById('btn-incoming'),
+        incomingBadge: document.getElementById('incoming-badge'),
+        incomingModalElement: document.getElementById('incomingModal'),
+        incomingTableBody: document.getElementById('incoming-table-body'),
+
+        clientModalElement: document.getElementById('clientModal'),
+        modalTitle: document.getElementById('modalTitle'),
+        clientForm: document.getElementById('clientForm'),
+        btnSave: document.getElementById('btn-save'),
+        
+        formId: document.getElementById('formId'),
+        formNamaSekolah: document.getElementById('formNamaSekolah'),
+        formStatus: document.getElementById('formStatus'),
+        formNamaKop: document.getElementById('formNamaKop'),
+        formNpsn: document.getElementById('formNpsn'),
+        formDesa: document.getElementById('formDesa'),
+        formKecamatan: document.getElementById('formKecamatan'),
+        formKabupaten: document.getElementById('formKabupaten'),
+        formProvinsi: document.getElementById('formProvinsi'),
+        formLinkExec: document.getElementById('formLinkExec'),
+        formKet: document.getElementById('formKet'),
+        formTahap1: document.getElementById('formTahap1'),
+        formTahap2: document.getElementById('formTahap2'),
+
+        btnInfo: document.getElementById('btn-info'),
+        infoModalElement: document.getElementById('infoModal'),
+        infoModalContent: document.getElementById('infoModalContent')
+    };
+
+    const bsModal = new bootstrap.Modal(el.clientModalElement);
+    const bsInfoModal = new bootstrap.Modal(el.infoModalElement);
+    const bsIncomingModal = new bootstrap.Modal(el.incomingModalElement);
+
+    const Toast = Swal.mixin({
+        toast: true,
+        position: 'top-end',
+        showConfirmButton: false,
+        timer: 3000,
+        customClass: { popup: 'rounded-4 shadow-sm border-0' }
+    });
+
+    const init = () => { setupEventListeners(); };
+
+    const setupEventListeners = () => {
+        el.loginForm.addEventListener('submit', handleLogin);
+        el.btnLogout.addEventListener('click', handleLogout);
+        el.btnReload.addEventListener('click', () => {
+            fetchClients();
+            fetchIncomingData(); // Refresh notifikasi juga
+        });
+        el.searchInput.addEventListener('input', (e) => {
+            state.searchQuery = e.target.value.toLowerCase();
+            renderTable();
+        });
+        
+        el.btnAdd.addEventListener('click', () => openModal());
+        el.btnIncoming.addEventListener('click', () => {
+            renderIncomingTable();
+            bsIncomingModal.show();
+        });
+
+        el.clientForm.addEventListener('submit', handleSaveClient);
+        el.formId.addEventListener('input', extractSpreadsheetId);
+        el.clientModalElement.addEventListener('hidden.bs.modal', resetForm);
+        
+        el.btnInfo.addEventListener('click', handleOpenInfo);
+    };
+
+    const handleLogin = (e) => {
+        e.preventDefault();
+        const pin = el.pinInput.value;
+        if (pin.length !== 6) return;
+
+        setLoading(el.btnLogin, true, "Memproses...");
+        
+        google.script.run
+            .withSuccessHandler((res) => {
+                setLoading(el.btnLogin, false, '<i class="bi bi-box-arrow-in-right me-2"></i> Masuk Panel');
+                if (res.success && res.isValid) {
+                    state.isAuthenticated = true;
+                    el.pinInput.value = '';
+                    switchView('dashboard');
+                    fetchClients();
+                    fetchIncomingData(); // Tarik notif form masuk saat berhasil login
+                    Toast.fire({ icon: 'success', title: 'Akses Diberikan' });
+                } else {
+                    Toast.fire({ icon: 'error', title: 'PIN Salah!' });
+                }
+            })
+            .withFailureHandler(() => {
+                setLoading(el.btnLogin, false, '<i class="bi bi-box-arrow-in-right me-2"></i> Masuk Panel');
+                Toast.fire({ icon: 'error', title: 'Koneksi Gagal' });
+            })
+            .verifyPin(pin);
+    };
+
+    const handleLogout = () => {
+        state.isAuthenticated = false;
+        state.clients = [];
+        state.incomingData = [];
+        state.globalSettings = null; 
+        switchView('login');
+        Toast.fire({ icon: 'info', title: 'Sesi diakhiri.' });
+    };
+
+    const switchView = (view) => {
+        if (view === 'login') {
+            el.viewLogin.classList.remove('d-none');
+            el.viewDashboard.classList.add('d-none');
+        } else {
+            el.viewLogin.classList.add('d-none');
+            el.viewDashboard.classList.remove('d-none');
+        }
+    };
+
+    // ==========================================
+    // LOGIKA FITUR DATA MASUK (FORM)
+    // ==========================================
+    const fetchIncomingData = () => {
+        // Panggil fungsi Backend (Nanti kita buat di Kode.gs opsi A)
+        google.script.run
+            .withSuccessHandler((res) => {
+                if(res.success) {
+                    state.incomingData = res.data;
+                    if(state.incomingData.length > 0) {
+                        el.incomingBadge.innerText = state.incomingData.length;
+                        el.incomingBadge.classList.remove('d-none');
+                    } else {
+                        el.incomingBadge.classList.add('d-none');
+                    }
+                }
+            })
+            .withFailureHandler((err) => console.error("Gagal menarik data antrean form.", err))
+            .getPendingFormData();
+    };
+
+    const renderIncomingTable = () => {
+        if (state.incomingData.length === 0) {
+            el.incomingTableBody.innerHTML = `<tr><td colspan="6" class="text-center py-5 text-muted"><i class="bi bi-check2-circle fs-2 d-block mb-2 text-success"></i>Tidak ada antrean form baru.</td></tr>`;
+            return;
+        }
+
+        let html = '';
+        state.incomingData.forEach((c, index) => {
+            // Jika status validasi dari backend adalah 'Duplikat', warnai merah
+            const isDuplicate = c.validationStatus === 'Duplikat';
+            const rowClass = isDuplicate ? 'table-danger bg-opacity-10' : '';
+            const statusBadge = isDuplicate ? `<span class="badge-soft badge-soft-danger"><i class="bi bi-exclamation-triangle"></i> NPSN Sudah Ada</span>` : `<span class="badge-soft badge-soft-success">Aman</span>`;
+
+            html += `
+                <tr class="${rowClass}">
+                    <td class="text-center fw-semibold text-muted">${index + 1}</td>
+                    <td class="small text-muted">${c.timestamp || '-'}</td>
+                    <td class="fw-medium">${c.namaSekolah}</td>
+                    <td class="fw-bold">${c.npsn || '-'}</td>
+                    <td>${statusBadge}</td>
+                    <td class="text-end pe-4">
+                        <div class="d-flex justify-content-end gap-2">
+                            <button class="btn-action btn-action-success" onclick="AppLogic.reviewIncoming(${index})" title="Review & Terima Data"><i class="bi bi-check2-square"></i></button>
+                            <button class="btn-action btn-action-delete" onclick="AppLogic.rejectIncoming(${index}, ${c.rowIdx})" title="Abaikan / Hapus"><i class="bi bi-x-lg"></i></button>
+                        </div>
+                    </td>
+                </tr>
+            `;
+        });
+        el.incomingTableBody.innerHTML = html;
+    };
+
+    // =======================================================
+    // FUNGSI PEMBANTU: Ekstrak ID dari URL Spreadsheet
+    // =======================================================
+    const extractSheetId = (inputString) => {
+        if (!inputString) return '';
+        const match = inputString.match(/\/d\/([a-zA-Z0-9-_]+)/);
+        return match ? match[1] : inputString.trim();
+    };
+
+    const reviewIncoming = (index) => {
+        const formData = state.incomingData[index];
+        bsIncomingModal.hide(); // Tutup modal form masuk
+        
+        // Simpan index baris untuk dikirim ke Backend nanti agar statusnya ter-update
+        state.pendingFormRowIdx = formData.rowIdx; 
+        
+        // Buat salinan data dan terapkan Regex untuk mengekstrak ID-nya saja
+        const dataToFill = { ...formData };
+        dataToFill.id = extractSheetId(dataToFill.id);
+        
+        // Panggil openModal dengan flag isAutoFill = true
+        openModal(dataToFill, true); 
+        
+        Toast.fire({ icon: 'info', title: 'Silakan periksa kembali data sebelum menyimpan.' });
+    };
+
+    const rejectIncoming = (index, rowIdx) => {
+        Swal.fire({
+            title: 'Abaikan Data Ini?',
+            text: "Data akan ditandai sebagai 'Ditolak' dan tidak akan muncul lagi di antrean.",
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonText: 'Ya, Abaikan',
+            cancelButtonText: 'Batal'
+        }).then((result) => {
+            if(result.isConfirmed) {
+                // Hapus sementara dari UI agar responsif
+                state.incomingData.splice(index, 1);
+                renderIncomingTable();
+                
+                // Update badge
+                if(state.incomingData.length > 0) el.incomingBadge.innerText = state.incomingData.length;
+                else el.incomingBadge.classList.add('d-none');
+
+                // Tembak ke Backend untuk update status menjadi 'Ditolak'
+                google.script.run
+                    .withSuccessHandler(() => Toast.fire({ icon: 'success', title: 'Data diabaikan.' }))
+                    .withFailureHandler(() => Toast.fire({ icon: 'error', title: 'Gagal mengabaikan data di server.' }))
+                    .markFormProcessed(rowIdx, 'Ditolak - Diabaikan Admin');
+            }
+        });
+    };
+
+    // ==========================================
+    // LOGIKA UTAMA (CRUD & DASHBOARD)
+    // ==========================================
+    const fetchClients = () => {
+        renderSkeleton();
+        google.script.run
+            .withSuccessHandler((res) => {
+                if (res.success) {
+                    state.clients = res.data;
+                    renderTable();
+                } else {
+                    Toast.fire({ icon: 'error', title: res.message });
+                    el.tableBody.innerHTML = `<tr><td colspan="7" class="text-center text-muted py-4">Gagal memuat data.</td></tr>`;
+                }
+            })
+            .withFailureHandler(() => Toast.fire({ icon: 'error', title: 'Gagal memuat data' }))
+            .getClients();
+    };
+
+    const renderSkeleton = () => {
+        el.clientCount.innerText = "Memuat data...";
+        let html = '';
+        for(let i=0; i<5; i++) {
+            html += `
+                <tr>
+                    <td class="text-center"><span class="skeleton" style="width: 20px;"></span></td>
+                    <td><span class="skeleton" style="width: 120px;"></span><br><span class="skeleton" style="width: 80px; height: 0.8rem; margin-top: 4px;"></span></td>
+                    <td><span class="skeleton" style="width: 150px;"></span></td>
+                    <td><span class="skeleton mb-1" style="width: 60px;"></span><br><span class="skeleton" style="width: 100px; height: 0.8rem;"></span></td>
+                    <td><span class="skeleton mb-1" style="width: 140px;"></span><br><span class="skeleton" style="width: 80px; height: 0.8rem;"></span></td>
+                    <td><span class="skeleton mb-1" style="width: 40px; height: 0.8rem;"></span><br><span class="skeleton" style="width: 40px; height: 0.8rem;"></span></td>
+                    <td class="text-end pe-4">
+                        <div class="d-flex justify-content-end gap-2">
+                            <span class="skeleton" style="width: 32px; height: 32px; border-radius: 8px;"></span>
+                            <span class="skeleton" style="width: 32px; height: 32px; border-radius: 8px;"></span>
+                            <span class="skeleton" style="width: 32px; height: 32px; border-radius: 8px;"></span>
+                        </div>
+                    </td>
+                </tr>
+            `;
+        }
+        el.tableBody.innerHTML = html;
+    };
+
+    const renderTable = () => {
+        const filtered = state.clients.filter(c => {
+            if(!state.searchQuery) return true;
+            const str = `${c.id} ${c.namaSekolah} ${c.npsn} ${c.desa} ${c.kabupaten} ${c.status}`.toLowerCase();
+            return str.includes(state.searchQuery);
+        });
+
+        el.clientCount.innerHTML = `Total Data: <strong>${state.clients.length}</strong> Klien | Ditampilkan: <strong>${filtered.length}</strong>`;
+
+        if (filtered.length === 0) {
+            el.tableBody.innerHTML = `<tr><td colspan="7" class="text-center py-5 text-muted"><i class="bi bi-inbox fs-2 d-block mb-2 text-black-50"></i>Belum ada data klien.</td></tr>`;
+            return;
+        }
+
+        let html = '';
+        filtered.forEach((c, index) => {
+            const isOff = c.id.startsWith('OFF_');
+            const statusBadge = c.status === 'Aktif' ? 'badge-soft-success' : 'badge-soft-secondary';
+            
+            const t1Color = c.tahap1 === 'Sudah' ? 'text-success fw-bold' : 'text-danger fw-bold';
+            const t2Color = c.tahap2 === 'Sudah' ? 'text-success fw-bold' : 'text-danger fw-bold';
+            const t1Icon = c.tahap1 === 'Sudah' ? '✓' : 'X';
+            const t2Icon = c.tahap2 === 'Sudah' ? '✓' : 'X';
+            
+            const shortId = c.id.length > 18 ? c.id.substring(0, 18) + '...' : c.id;
+            const shortKop = c.namaKop && c.namaKop.length > 20 ? c.namaKop.substring(0, 20) + '...' : c.namaKop;
+            
+            const lokasiStr = c.desa ? `${c.desa}, Kec. ${c.kecamatan || '-'}` : `Kec. ${c.kecamatan || '-'}`;
+            const shortLokasi = lokasiStr.length > 22 ? lokasiStr.substring(0, 22) + '...' : lokasiStr;
+            
+            html += `
+                <tr>
+                    <td class="text-center fw-medium text-muted">${index + 1}</td>
+                    <td>
+                        <div class="fw-bold ${isOff ? 'text-danger' : 'text-dark'} mb-1" title="${c.id}">${shortId}</div>
+                        <div class="text-muted" style="font-size: 0.8rem;">NPSN: ${c.npsn || '-'}</div>
+                    </td>
+                    <td class="fw-semibold text-dark">${c.namaSekolah || '-'}</td>
+                    <td>
+                        <span class="badge-soft ${statusBadge} d-inline-block mb-1">${c.status}</span>
+                        <div class="text-muted text-uppercase" style="font-size: 0.8rem;" title="${c.namaKop}">${shortKop || '-'}</div>
+                    </td>
+                    <td>
+                        <div class="fw-medium text-dark mb-1" title="${c.desa}, ${c.kecamatan}">${shortLokasi}</div>
+                        <div class="text-muted" style="font-size: 0.8rem;" title="${c.kabupaten}">${c.kabupaten || '-'}</div>
+                    </td>
+                    <td class="fw-medium" style="font-size: 0.85rem;">
+                        <div class="${t1Color} mb-1">T1: ${t1Icon}</div>
+                        <div class="${t2Color}">T2: ${t2Icon}</div>
+                    </td>
+                    <td class="text-end pe-4">
+                        <div class="d-flex justify-content-end gap-2">
+                            ${c.npsn ? `<a href="https://spjku.netlify.app/?id=${c.npsn}" target="_blank" class="btn-action btn-action-link" title="Buka Web App Klien"><i class="bi bi-link-45deg fs-5"></i></a>` : `<span class="btn-action" style="background: #f8fafc; color: #cbd5e1; cursor: not-allowed;" title="Belum ada NPSN"><i class="bi bi-link-45deg fs-5"></i></span>`}
+                            <button class="btn-action btn-action-edit" onclick="AppLogic.openEdit('${c.id}')" title="Edit"><i class="bi bi-pencil-fill" style="font-size: 0.85rem;"></i></button>
+                            <button class="btn-action btn-action-delete" onclick="AppLogic.confirmDelete('${c.id}')" title="Hapus"><i class="bi bi-trash3-fill" style="font-size: 0.85rem;"></i></button>
+                        </div>
+                    </td>
+                </tr>
+            `;
+        });
+        el.tableBody.innerHTML = html;
+    };
+
+    // MODIFIKASI: Mendukung mode AutoFill dari Data Form
+    const openModal = (clientData = null, isAutoFill = false) => {
+        // Jika data ada dan BUKAN autofill, berarti mode Edit murni.
+        state.isEditing = !!clientData && !isAutoFill;
+        
+        el.modalTitle.innerText = state.isEditing ? 'Edit Klien' : (isAutoFill ? 'Review & Simpan Data' : 'Tambah Klien Baru');
+        
+        if (clientData) {
+            if (state.isEditing) state.editOldId = clientData.id;
+            
+            el.formId.value = clientData.id || '';
+            el.formNamaSekolah.value = clientData.namaSekolah || '';
+            el.formStatus.value = clientData.status || 'Aktif';
+            el.formNamaKop.value = clientData.namaKop || '';
+            el.formNpsn.value = clientData.npsn || '';
+            el.formDesa.value = clientData.desa || '';
+            el.formKecamatan.value = clientData.kecamatan || '';
+            el.formKabupaten.value = clientData.kabupaten || 'Sekadau';
+            el.formProvinsi.value = clientData.provinsi || 'Kalimantan Barat';
+            el.formLinkExec.value = clientData.linkExec || '';
+            el.formKet.value = clientData.ket || '';
+            el.formTahap1.value = clientData.tahap1 || 'Belum';
+            el.formTahap2.value = clientData.tahap2 || 'Belum';
+        }
+        bsModal.show();
+    };
+
+    const openEdit = (id) => {
+        const clientData = state.clients.find(c => c.id === id);
+        if(clientData) openModal(clientData); // isAutoFill default false
+    };
+
+    const resetForm = () => {
+        el.clientForm.reset();
+        state.isEditing = false;
+        state.editOldId = null;
+        state.pendingFormRowIdx = null; // Reset jembatan rowIdx
+        el.formKabupaten.value = 'Sekadau';
+        el.formProvinsi.value = 'Kalimantan Barat';
+        el.formStatus.value = 'Aktif';
+        el.formTahap1.value = 'Belum';
+        el.formTahap2.value = 'Belum';
+    };
+
+    const extractSpreadsheetId = () => {
+        // Gunakan fungsi pembantu yang sama untuk event paste manual
+        el.formId.value = extractSheetId(el.formId.value);
+    };
+
+    const handleSaveClient = (e) => {
+        e.preventDefault();
+        const payload = {
+            id: el.formId.value.trim(),
+            namaSekolah: el.formNamaSekolah.value.trim(),
+            status: el.formStatus.value,
+            namaKop: el.formNamaKop.value.trim(),
+            npsn: el.formNpsn.value.trim(),
+            desa: el.formDesa.value.trim(),
+            kecamatan: el.formKecamatan.value.trim(),
+            kabupaten: el.formKabupaten.value.trim(),
+            provinsi: el.formProvinsi.value.trim(),
+            linkExec: el.formLinkExec.value.trim(),
+            ket: el.formKet.value.trim(),
+            tahap1: el.formTahap1.value,
+            tahap2: el.formTahap2.value,
+            // Jika ini dari AutoFill Form, sertakan rowIdx agar Backend bisa update statusnya
+            formRowIdx: state.pendingFormRowIdx 
+        };
+
+        setLoading(el.btnSave, true, "Menyimpan...");
+
+        if (state.isEditing) {
+            google.script.run
+                .withSuccessHandler((res) => onSaveResponse(res, payload, true))
+                .withFailureHandler(() => onSaveError())
+                .updateClient(state.editOldId, payload);
+        } else {
+            google.script.run
+                .withSuccessHandler((res) => onSaveResponse(res, payload, false))
+                .withFailureHandler(() => onSaveError())
+                .addClient(payload); // addClient di backend nanti harus mengecek formRowIdx
+        }
+    };
+
+    const onSaveResponse = (res, payload, isEdit) => {
+        setLoading(el.btnSave, false, '<i class="bi bi-check2-circle me-1"></i> Simpan Data');
+        if (res.success) {
+            bsModal.hide();
+            Toast.fire({ icon: 'success', title: res.message });
+            if(isEdit) {
+                const idx = state.clients.findIndex(c => c.id === state.editOldId);
+                if(idx !== -1) state.clients[idx] = payload;
+            } else {
+                state.clients.push(payload);
+                // Jika sukses nyimpan dan asalnya dari Form Masuk, refresh notifikasi
+                if (payload.formRowIdx) fetchIncomingData(); 
+            }
+            renderTable();
+        } else {
+            Toast.fire({ icon: 'error', title: res.message });
+        }
+    };
+
+    const onSaveError = () => {
+        setLoading(el.btnSave, false, '<i class="bi bi-check2-circle me-1"></i> Simpan Data');
+        Toast.fire({ icon: 'error', title: 'Terjadi Kesalahan Server' });
+    };
+
+    const confirmDelete = (id) => {
+        Swal.fire({
+            title: 'Hapus Klien ini?',
+            text: "Data akan dihapus permanen dari Spreadsheet.",
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#dc3545',
+            cancelButtonColor: '#6c757d',
+            confirmButtonText: 'Ya, Hapus',
+            cancelButtonText: 'Batal',
+            customClass: { popup: 'rounded-4 border-0 shadow-lg' }
+        }).then((result) => {
+            if (result.isConfirmed) {
+                Toast.fire({ icon: 'info', title: 'Menghapus data...' });
+                google.script.run
+                    .withSuccessHandler((res) => {
+                        if (res.success) {
+                            state.clients = state.clients.filter(c => c.id !== id);
+                            renderTable();
+                            Toast.fire({ icon: 'success', title: 'Berhasil Dihapus' });
+                        } else {
+                            Toast.fire({ icon: 'error', title: res.message });
+                        }
+                    })
+                    .withFailureHandler(() => Toast.fire({ icon: 'error', title: 'Gagal Menghapus' }))
+                    .deleteClient(id);
+            }
+        });
+    };
+    
+    // Global Settings (Info Modal) ... (kode tidak diubah untuk menghemat ruang)
+    const handleOpenInfo = () => {
+        if (!state.globalSettings) {
+            el.infoModalContent.innerHTML = `<div class="text-center py-5"><div class="spinner-border spinner-border-sm text-primary mb-2"></div><div>Memuat informasi...</div></div>`;
+            bsInfoModal.show();
+            fetchGlobalSettings();
+        } else {
+            renderInfoModal();
+            bsInfoModal.show();
+        }
+    };
+    const fetchGlobalSettings = () => {
+        google.script.run
+            .withSuccessHandler((res) => {
+                if (res.success) { state.globalSettings = res.data; renderInfoModal(); }
+            }).getGlobalSettings();
+    };
+    const renderInfoModal = () => {
+        if (!state.globalSettings || state.globalSettings.length === 0) { el.infoModalContent.innerHTML = `<div class="text-center text-muted">Belum ada pengaturan.</div>`; return; }
+        let html = '<div class="d-flex flex-column gap-3">';
+        state.globalSettings.forEach((item, i) => {
+            html += `<div class="card-saas p-3 bg-light"><label class="form-label fw-bold small">${item.name}</label><div class="input-group"><input type="text" id="link-${i}" class="form-control bg-white" value="${item.url}" readonly><button class="btn btn-primary-saas px-3" onclick="AppLogic.copyLink('link-${i}')"><i class="bi bi-copy"></i></button></div></div>`;
+        });
+        el.infoModalContent.innerHTML = html + '</div>';
+    };
+    const copyLink = (inputId) => {
+        const el = document.getElementById(inputId);
+        if(!el) return; el.select(); document.execCommand('copy');
+        Toast.fire({ icon: 'success', title: 'Disalin!' });
+    };
+
+    const setLoading = (btn, isLoading, content) => {
+        btn.disabled = isLoading;
+        btn.innerHTML = isLoading ? `<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> ${content}` : content;
+    };
+
+    return { init, openEdit, confirmDelete, copyLink, reviewIncoming, rejectIncoming };
+})();
+
+document.addEventListener('DOMContentLoaded', AppLogic.init);
+</script>
