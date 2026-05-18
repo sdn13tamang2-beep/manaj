@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Panel - Klien Mahap</title>
+    
+    <!-- Google Fonts: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Bootstrap 5 CDN -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    
+    <!-- SweetAlert2 CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11.10.7/dist/sweetalert2.all.min.js"></script>
+    
+    <style>
+        /* ====================================================
+           SaaS DESIGN SYSTEM - Premium & Clean
+           ==================================================== */
+        :root {
+            --bg-body: #f8fafc;        /* Slate 50 */
+            --surface: #ffffff;
+            --text-main: #1e293b;      /* Slate 800 */
+            --text-muted: #64748b;     /* Slate 500 */
+            --border-color: #e2e8f0;   /* Slate 200 */
+            --primary: #2563eb;        /* Blue 600 */
+            --primary-hover: #1d4ed8;  /* Blue 700 */
+            --danger: #ef4444;         /* Red 500 */
+            --warning: #f59e0b;        /* Amber 500 */
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-body);
+            color: var(--text-main);
+            -webkit-font-smoothing: antialiased;
+            letter-spacing: -0.01em;
+        }
+
+        /* --- Custom Cards --- */
+        .card-saas {
+            background: var(--surface);
+            border: 1px solid var(--border-color);
+            border-radius: 1rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+        }
+
+        /* --- Typography & Badges --- */
+        .page-title { font-weight: 700; color: var(--text-main); letter-spacing: -0.02em; }
+        .text-subtitle { color: var(--text-muted); font-size: 0.875rem; }
+        
+        .badge-soft {
+            padding: 0.4em 0.75em;
+            font-weight: 600;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            letter-spacing: 0.02em;
+        }
+        .badge-soft-success { background-color: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
+        .badge-soft-danger { background-color: #fee2e2; color: #991b1b; border: 1px solid #fecaca; }
+        .badge-soft-warning { background-color: #fef3c7; color: #b45309; border: 1px solid #fde68a; }
+        .badge-soft-secondary { background-color: #f1f5f9; color: #475569; border: 1px solid #e2e8f0; }
+        
+        /* --- Inputs & Buttons --- */
+        .form-control, .form-select {
+            border-radius: 0.5rem;
+            border: 1px solid var(--border-color);
+            padding: 0.5rem 0.875rem; /* Padding diperkecil agar tidak terlalu tinggi */
+            font-size: 0.875rem;
+            color: var(--text-main);
+            box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.02);
+        }
+        .form-control:focus, .form-select:focus {
+            border-color: #93c5fd;
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+        }
+        
+        .btn-custom {
+            border-radius: 0.5rem;
+            font-weight: 500;
+            padding: 0.5rem 1rem; /* Disesuaikan agar sejajar presisi dengan form input */
+            font-size: 0.875rem;
+            display: inline-flex;
+            align-items: center;
+        }
+        .btn-primary-saas { background-color: var(--primary); color: white; border: none; }
+        .btn-primary-saas:hover { background-color: var(--primary-hover); color: white; }
+        .btn-light-saas { background-color: #f1f5f9; color: var(--text-main); border: 1px solid transparent; }
+        .btn-light-saas:hover { background-color: #e2e8f0; }
+        .btn-warning-saas { background-color: #fffbeb; color: #b45309; border: 1px solid #fde68a; }
+        .btn-warning-saas:hover { background-color: #fef3c7; color: #92400e; }
+
+        /* --- Action Buttons --- */
+        .btn-action {
+            width: 32px; height: 32px; padding: 0;
+            display: inline-flex; align-items: center; justify-content: center;
+            border-radius: 8px; border: none; transition: all 0.2s ease;
+            text-decoration: none;
+        }
+        .btn-action:hover { transform: translateY(-2px); }
+        .btn-action-link { background-color: #eef2ff; color: #6366f1; }
+        .btn-action-link:hover { background-color: #e0e7ff; color: #4f46e5; }
+        .btn-action-edit { background-color: #fffbeb; color: #f59e0b; }
+        .btn-action-edit:hover { background-color: #fef3c7; color: #d97706; }
+        .btn-action-delete { background-color: #fef2f2; color: #ef4444; }
+        .btn-action-delete:hover { background-color: #fee2e2; color: #dc2626; }
+        .btn-action-success { background-color: #dcfce7; color: #166534; }
+        .btn-action-success:hover { background-color: #bbf7d0; color: #14532d; }
+
+        /* --- Search Group --- */
+        .search-group {
+            width: 260px; /* Membatasi lebar kotak pencarian agar tidak terlalu besar */
+        }
+        .search-group:focus-within {
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+            border-radius: 0.5rem;
+        }
+        .search-group:focus-within .input-group-text,
+        .search-group:focus-within .form-control { border-color: #93c5fd; }
+        .search-group .form-control:focus { box-shadow: none; }
+
+        /* --- Table Styling --- */
+        .table-responsive { border-radius: 1rem; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+        .table { margin-bottom: 0; min-width: 800px; }
+        .table th {
+            background-color: #f8fafc; color: var(--text-muted);
+            font-size: 0.75rem; font-weight: 600; text-transform: uppercase;
+            padding: 1rem; border-bottom: 1px solid var(--border-color);
+        }
+        .table td { padding: 1rem; vertical-align: middle; font-size: 0.875rem; border-bottom: 1px solid var(--border-color); }
+        .table-hover tbody tr:hover { background-color: #f1f5f9; }
+
+        /* --- Modal Customization --- */
+        .modal-content {
+            border-radius: 1.25rem; border: none;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+        }
+        .modal-header { border-bottom: 1px solid var(--border-color); padding: 1.25rem 1.5rem; }
+        .modal-footer { border-top: 1px solid var(--border-color); background-color: #f8fafc; border-bottom-left-radius: 1.25rem; border-bottom-right-radius: 1.25rem; }
+
+        .skeleton { background-color: #e2e8f0; border-radius: 4px; height: 1rem; display: inline-block; }
+    </style>
+</head>
+<body>
+
+    <div id="app-shell">
+        <!-- VIEW: LOGIN -->
+        <div id="view-login" class="container min-vh-100 d-flex align-items-center justify-content-center p-3">
+            <div class="card-saas p-4 p-sm-5 w-100" style="max-width: 420px;">
+                <div class="text-center mb-4">
+                    <div class="d-inline-flex align-items-center justify-content-center bg-primary bg-opacity-10 text-primary rounded-circle mb-3" style="width: 64px; height: 64px;">
+                        <i class="bi bi-shield-lock-fill fs-2"></i>
+                    </div>
+                    <h3 class="page-title h4">Akses Sistem</h3>
+                    <p class="text-subtitle">Masukkan PIN admin untuk melanjutkan</p>
+                </div>
+                
+                <form id="loginForm">
+                    <div class="mb-4">
+                        <input type="password" id="pinInput" class="form-control text-center fs-4 fw-bold py-2 shadow-sm" style="letter-spacing: 0.25em; border-radius: 0.5rem;" maxlength="6" pattern="\d{6}" placeholder="••••••" required autocomplete="off">
+                    </div>
+                    <button type="submit" id="btn-login" class="btn btn-primary-saas btn-custom w-100 py-2 fs-6 fw-medium shadow-sm">
+                        <i class="bi bi-box-arrow-in-right me-2"></i> Masuk Panel
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- VIEW: DASHBOARD -->
+        <div id="view-dashboard" class="container-fluid py-4 py-lg-5 d-none" style="max-width: 1100px;">
+            <!-- Area Header & Navigasi -->
+            <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-end mb-4 gap-3">
+                <div>
+                    <h1 class="page-title h3 mb-1">Manajemen Klien</h1>
+                    <p class="text-subtitle mb-0" id="client-count">Memuat statistik data...</p>
+                </div>
+                
+                <div class="d-flex flex-column flex-sm-row gap-2">
+                    <div class="input-group search-group">
+                        <span class="input-group-text bg-white border-end-0 text-muted px-3"><i class="bi bi-search"></i></span>
+                        <input type="text" id="searchInput" class="form-control border-start-0 ps-0" placeholder="Cari nama, NPSN, lokasi...">
+                    </div>
+                    <div class="d-flex gap-2 flex-wrap">
+                        <button class="btn btn-light-saas btn-custom text-muted border" id="btn-info" title="Informasi & Tautan Global">
+                            <i class="bi bi-info-circle-fill"></i>
+                        </button>
+                        <button class="btn btn-light-saas btn-custom text-muted border" id="btn-reload" title="Muat Ulang">
+                            <i class="bi bi-arrow-clockwise"></i>
+                        </button>
+                        <!-- TOMBOL BARU: Form Masuk -->
+                        <button class="btn btn-warning-saas btn-custom position-relative fw-semibold" id="btn-incoming" title="Review Data dari Form">
+                            <i class="bi bi-inbox-fill me-1"></i> Data Masuk
+                            <span id="incoming-badge" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger border border-light d-none" style="font-size: 0.7rem;">
+                                0
+                            </span>
+                        </button>
+                        <button class="btn btn-primary-saas btn-custom text-nowrap" id="btn-add">
+                            <i class="bi bi-plus-lg me-1"></i> Tambah Klien
+                        </button>
+                        <button class="btn btn-danger btn-custom ms-sm-2 text-white" id="btn-logout" title="Keluar">
+                            <i class="bi bi-power"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Area Tabel Data -->
+            <div class="card-saas table-responsive">
+                <table class="table table-hover align-middle">
+                    <thead>
+                        <tr>
+                            <th class="text-center" style="width: 5%;">NO</th>
+                            <th style="width: 10%; min-width: 130px;">ID / NPSN</th>
+                            <th style="width: 25%;">NAMA SEKOLAH</th>
+                            <th style="width: 20%;">STATUS / KOP</th>
+                            <th style="width: 17%;">LOKASI</th>
+                            <th style="width: 8%;">PROGRESS</th>
+                            <th class="text-end pe-4" style="width: 15%;">AKSI</th>
+                        </tr>
+                    </thead>
+                    <tbody id="table-body">
+                        <!-- Data diinjeksi via JS -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL FORM KLIEN (Ditambahkan state AutoFill) -->
+    <div class="modal fade" id="clientModal" tabindex="-1" data-bs-backdrop="static">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title fw-bold text-main" id="modalTitle">Tambah Klien Baru</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <form id="clientForm">
+                        <div class="row g-4">
+                            <div class="col-12">
+                                <label class="form-label text-subtitle fw-semibold mb-1">ID Spreadsheet <span class="text-danger">*</span></label>
+                                <div class="input-group">
+                                    <span class="input-group-text bg-light text-muted"><i class="bi bi-link-45deg"></i></span>
+                                    <input type="text" id="formId" class="form-control" required placeholder="Paste link atau ID Spreadsheet di sini">
+                                </div>
+                            </div>
+                            <div class="col-md-12">
+                                <label class="form-label text-subtitle fw-semibold mb-1">Link Exec (URL Web App)</label>
+                                <div class="input-group">
+                                    <span class="input-group-text bg-light text-muted"><i class="bi bi-globe"></i></span>
+                                    <input type="url" id="formLinkExec" class="form-control" placeholder="https://script.google.com/macros/s/.../exec">
+                                </div>
+                            </div>
+                            <div class="col-md-8">
+                                <label class="form-label text-subtitle fw-semibold mb-1">Nama Sekolah <span class="text-danger">*</span></label>
+                                <input type="text" id="formNamaSekolah" class="form-control" required placeholder="Misal: SDN 1 Mahap">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label text-subtitle fw-semibold mb-1">NPSN</label>
+                                <input type="text" id="formNpsn" class="form-control" placeholder="8 Digit Angka" maxlength="8" minlength="8" pattern="\d{8}" oninput="this.value = this.value.replace(/[^0-9]/g, '')">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label text-subtitle fw-semibold mb-1">Status Publikasi</label>
+                                <select id="formStatus" class="form-select"><option value="Aktif">Aktif</option><option value="Tidak aktif">Tidak aktif</option></select>
+                            </div>
+                            <div class="col-md-8">
+                                <label class="form-label text-subtitle fw-semibold mb-1">Nama Kop (Kop Surat)</label>
+                                <input type="text" id="formNamaKop" class="form-control" placeholder="Opsional">
+                            </div>
+                            <div class="col-12"><hr class="my-0 text-muted opacity-25"></div>
+                            <div class="col-md-3 col-sm-6">
+                                <label class="form-label text-subtitle fw-semibold mb-1">Desa</label>
+                                <input type="text" id="formDesa" class="form-control" placeholder="Nama Desa">
+                            </div>
+                            <div class="col-md-3 col-sm-6">
+                                <label class="form-label text-subtitle fw-semibold mb-1">Kecamatan</label>
+                                <input type="text" id="formKecamatan" class="form-control" placeholder="Nama Kecamatan">
+                            </div>
+                            <div class="col-md-3 col-sm-6">
+                                <label class="form-label text-subtitle fw-semibold mb-1">Kabupaten</label>
+                                <input type="text" id="formKabupaten" class="form-control" value="Sekadau">
+                            </div>
+                            <div class="col-md-3 col-sm-6">
+                                <label class="form-label text-subtitle fw-semibold mb-1">Provinsi</label>
+                                <input type="text" id="formProvinsi" class="form-control" value="Kalimantan Barat">
+                            </div>
+                            <div class="col-12"><hr class="my-0 text-muted opacity-25"></div>
+                            <div class="col-md-6">
+                                <label class="form-label text-subtitle fw-semibold mb-1">Progress Tahap 1</label>
+                                <select id="formTahap1" class="form-select"><option value="Belum">Belum Selesai</option><option value="Sudah">Sudah Selesai</option></select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label text-subtitle fw-semibold mb-1">Progress Tahap 2</label>
+                                <select id="formTahap2" class="form-select"><option value="Belum">Belum Selesai</option><option value="Sudah">Sudah Selesai</option></select>
+                            </div>
+                            <div class="col-md-12">
+                                <label class="form-label text-subtitle fw-semibold mb-1">Catatan Tambahan (Ket.)</label>
+                                <textarea id="formKet" class="form-control" rows="2" placeholder="Tuliskan keterangan jika ada..." style="resize: vertical;"></textarea>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer px-4 py-3 border-0">
+                    <button type="button" class="btn btn-light-saas btn-custom px-4" data-bs-dismiss="modal">Batal</button>
+                    <button type="submit" form="clientForm" class="btn btn-primary-saas btn-custom px-4" id="btn-save">
+                        <i class="bi bi-check2-circle me-1"></i> Simpan Data
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL BARU: DATA MASUK DARI FORM -->
+    <div class="modal fade" id="incomingModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title fw-bold text-main">
+                        <i class="bi bi-inbox text-warning me-2"></i> Review Data Form Masuk
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-0">
+                    <div class="table-responsive m-0" style="max-height: 60vh;">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="sticky-top bg-white shadow-sm">
+                                <tr>
+                                    <th class="text-center" style="width: 5%;">No</th>
+                                    <th style="width: 15%;">Waktu Submit</th>
+                                    <th style="width: 25%;">Nama Sekolah</th>
+                                    <th style="width: 15%;">NPSN</th>
+                                    <th style="width: 20%;">Status (Validasi)</th>
+                                    <th class="text-end pe-4" style="width: 20%;">Aksi</th>
+                                </tr>
+                            </thead>
+                            <tbody id="incoming-table-body">
+                                <!-- Data Form Masuk Diinjeksi di Sini -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL INFO GLOBAL & TAUTAN PENTING -->
+    <div class="modal fade" id="infoModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header border-0 pb-0 mt-2 mx-2">
+                    <h5 class="modal-title fw-bold text-main d-flex align-items-center">
+                        <div class="bg-primary bg-opacity-10 text-primary rounded d-flex align-items-center justify-content-center me-3" style="width: 40px; height: 40px;">
+                            <i class="bi bi-info-lg fs-4"></i>
+                        </div>
+                        Tautan Penting
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-4 pt-3" id="infoModalContent">
+                    <!-- Konten link diinjeksi via JS -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS Bundle -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- Memanggil File JS.html -->
+    <?!= include('JS'); ?>
+
+</body>
+</html>
